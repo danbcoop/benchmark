@@ -5,7 +5,6 @@
 #include <pthread.h>
 
 #include "lib.c"
-#include "main.h"
 
 //extern int shared_count;
 
@@ -22,11 +21,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    Config cfg = { 0, 0, 0, 0 }; // Declare with default values to satisfy the compiler
+    Config cfg = { 0, 0, 0, 0 }; // Initialize with default values to satisfy the compiler
 
-    read_header(file, &cfg);
-    printf("Config:\n\tMemory: %d\tElement: %d\n\tThreads: %d\tAccess type: %d\n", 
+    read_config(file, &cfg);
+    if (VERBOSE) {
+        printf("Config:\n\tMemory: %d\tElement: %d\n\tThreads: %d\tAccess type: %d\n", 
                     cfg.SIZE_MEMORY, cfg.SIZE_ELEMENTS, cfg.NUM_THREADS, cfg.ACCESS);
+    }
 
     pthread_t threads[cfg.NUM_THREADS];
     ThreadData thread_data[cfg.NUM_THREADS];

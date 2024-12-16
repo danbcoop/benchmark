@@ -4,20 +4,23 @@
 #include <ctype.h>
 #include <pthread.h>
 
-#include "main.h"
+#define MAX_LINE_LENGTH 256
+#define NUMBERS_PER_LINE 20
+#define NUM_CONFIG_PARAMS 6
+#define VERBOSE 1
+#define COLORS 4
 
-// color codes for threads
-const char *thread_colors[4] = {
-    "\033[31m", // Red
-    "\033[32m", // Green
-    "\033[33m", // Yellow
-    "\033[34m"  // Blue
+const char *thread_colors[COLORS] = {
+    "\033[31m", // red
+    "\033[32m", // green
+    "\033[33m", // yellow
+    "\033[34m"  // blue
 };
 const char *reset_color = "\033[0m";
 
 typedef enum access_type {
-    RW,
-    R,
+    rw,
+    r,
 } access_type;
 
 typedef struct {
@@ -54,7 +57,7 @@ void parse_numbers_from_line(const char *line, int *numbers, int *count) {
 }
 
 
-void read_header(FILE *file, Config *cfg) {
+void read_config(FILE *file, Config *cfg) {
     char line[MAX_LINE_LENGTH];
     int values[NUM_CONFIG_PARAMS];
     int count = 0;
@@ -80,7 +83,7 @@ void read_header(FILE *file, Config *cfg) {
 
 
 void print_address(int address, int thread_id) {
-    printf("%s%d%s ", thread_colors[thread_id], address, reset_color);
+    printf("%s%d%s ", thread_colors[thread_id % COLORS], address, reset_color);
 
     pthread_mutex_lock(&count_mutex);
     shared_count++;

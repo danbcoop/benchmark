@@ -1,4 +1,0 @@
-#define MAX_LINE_LENGTH 256
-#define NUMBERS_PER_LINE 20
-#define NUM_CONFIG_PARAMS 6
-
