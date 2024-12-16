@@ -6,10 +6,6 @@
 
 #include "main.h"
 
-#define MAX_LINE_LENGTH 256
-#define MAX_NUMBERS_PER_LINE 100
-
-
 // color codes for threads
 const char *thread_colors[4] = {
     "\033[31m", // Red
