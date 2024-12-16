@@ -1,0 +1,26 @@
+# Set the distribution of memory accesses
+distribution = ZIPFIAN # ZIPFIAN (default), UNIFORM
+zipfian_alpha = 1.000001 # float >1
+
+# Set relative share of acces pattern in percent (should add up to 100)
+pattern_strided = 10
+pattern_sequential = 80
+pattern_random = 10
+pattern_ladder = 0
+
+# Not all access adresses can be fit into a specific pattern and still be of zipfian distribution.
+# If you want to drop any access indices that don't fit into the pattern, set strict_patterns = true.
+strict_patterns = true # true/false
+
+param_stride = 3
+param_pattern_length = 8
+
+size_of_element = 16*1024
+
+memory = 2*1024*1024
+threads = 1
+
+access_type = rw # r, rw
+
+# If you don't want to generate new memory access patterns: reuse_patterns=true.
+reuse_patterns = false # true/false
