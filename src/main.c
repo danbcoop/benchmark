@@ -24,8 +24,8 @@ int main(int argc, char *argv[]) {
     
     read_config(file, &cfg);
 #ifdef VERBOSE
-        printf("Config:\n\tMemory: %d\tElement: %d\n\tThreads: %d\n", 
-                    cfg.SIZE_MEMORY, cfg.SIZE_ELEMENTS, cfg.NUM_THREADS);
+        printf("Config:\n\tMemory: %d\tElement: %d\n\tAddresses: %d\tThreads: %d\n", 
+                    cfg.SIZE_MEMORY, cfg.SIZE_ELEMENTS, cfg.NUM_ADDRESSES, cfg.NUM_THREADS);
 #endif
 
 #ifndef TEST
