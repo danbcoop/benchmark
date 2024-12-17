@@ -38,7 +38,6 @@ typedef struct {
     int thread_id;
     FILE *file;
     pthread_mutex_t *file_mutex;
-    void *data;
 } ThreadData;
 
 typedef struct {
