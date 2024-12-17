@@ -4,11 +4,14 @@
 #include <ctype.h>
 #include <pthread.h>
 
+#include "memory.c"
+
 #define MAX_LINE_LENGTH 256
 #define NUMBERS_PER_LINE 20
 #define NUM_CONFIG_PARAMS 6
-#define VERBOSE 1
+#define VERBOSE 
 #define COLORS 4
+#define TEST
 
 const char *thread_colors[COLORS] = {
     "\033[31m", // red
@@ -27,16 +30,23 @@ typedef struct {
     int SIZE_MEMORY;
     int SIZE_ELEMENTS;
     int NUM_THREADS;
-    access_type ACCESS;
+    int NUM_ADDRESSES;
+    void (*access)(char*);
 } Config;
 
 typedef struct {
     int thread_id;
     FILE *file;
     pthread_mutex_t *file_mutex;
-    Config *cfg;
+    void *data;
 } ThreadData;
 
+typedef struct {
+    char *bytes;
+} Data;
+
+Data* data;
+Config cfg = {.SIZE_MEMORY=0, .SIZE_ELEMENTS=0, .NUM_THREADS=0, .NUM_ADDRESSES=0, .access=read_write};
 int shared_count = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -55,6 +65,7 @@ void parse_numbers_from_line(const char *line, int *numbers, int *count) {
         }
     }
 }
+
 
 
 void read_config(FILE *file, Config *cfg) {
@@ -78,9 +89,15 @@ void read_config(FILE *file, Config *cfg) {
                 break;
         }
     }
-
+    cfg->NUM_ADDRESSES = cfg->SIZE_MEMORY / cfg->SIZE_ELEMENTS;
 }
 
+
+void access_memory(int address) {
+    for (int i = 0; i < cfg.SIZE_ELEMENTS; i++) {
+        cfg.access(&(data[address].bytes[i]));
+    }
+}
 
 void print_address(int address, int thread_id) {
     printf("%s%d%s ", thread_colors[thread_id % COLORS], address, reset_color);
@@ -112,9 +129,39 @@ void *process_lines(void *arg) {
         parse_numbers_from_line(line, addresses, &count);
 
         for (int i = 0; i < count; i++) {
-            print_address(addresses[i], thread->thread_id);
+#ifdef TEST
+        print_address(addresses[i], thread->thread_id);
+#endif
+#ifndef TEST
+        access_memory(addresses[i]);
+#endif
         }
     }
 
     return NULL;
+}
+
+
+void initialize_data() {
+    for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
+        for (int j = 0; j < cfg.SIZE_ELEMENTS; j++) {
+            data[i].bytes[j] = 0;
+        }
+    }
+}
+
+int allocate_data() {
+    data = (Data*)malloc(cfg.NUM_ADDRESSES * sizeof(Data));
+    if (data == NULL) {
+        printf("Memory allocation failed.\n");
+        return 0;
+    }
+    for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
+        data[i].bytes = (char*)malloc(cfg.SIZE_ELEMENTS * sizeof(char));
+        if (data[i].bytes == NULL) {
+            printf("Memory allocation failed.\n");
+            return 0;
+        }
+    }
+    return 1;
 }
