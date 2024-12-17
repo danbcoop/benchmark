@@ -6,6 +6,7 @@
 
 #include "lib.c"
 
+extern Config cfg;
 //extern int shared_count;
 
 int main(int argc, char *argv[]) {
@@ -21,13 +22,19 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    Config cfg = { 0, 0, 0, 0 }; // Initialize with default values to satisfy the compiler
-
     read_config(file, &cfg);
-    if (VERBOSE) {
-        printf("Config:\n\tMemory: %d\tElement: %d\n\tThreads: %d\tAccess type: %d\n", 
-                    cfg.SIZE_MEMORY, cfg.SIZE_ELEMENTS, cfg.NUM_THREADS, cfg.ACCESS);
+#ifdef VERBOSE
+        printf("Config:\n\tMemory: %d\tElement: %d\n\tThreads: %d\n", 
+                    cfg.SIZE_MEMORY, cfg.SIZE_ELEMENTS, cfg.NUM_THREADS);
+#endif
+
+#ifndef TEST
+    // Allocate and initialize data
+    if (!allocate_data()) {
+        return 0;
     }
+    initialize_data();
+#endif
 
     pthread_t threads[cfg.NUM_THREADS];
     ThreadData thread_data[cfg.NUM_THREADS];
@@ -37,7 +44,6 @@ int main(int argc, char *argv[]) {
         thread_data[i].thread_id = i;
         thread_data[i].file = file;
         thread_data[i].file_mutex = &file_mutex;
-        thread_data[i].cfg = &cfg;
 
         if (pthread_create(&threads[i], NULL, process_lines, &thread_data[i]) != 0) {
             perror("Error creating thread");
