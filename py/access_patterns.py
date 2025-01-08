@@ -16,7 +16,6 @@ PATTERNNR = 0
 PLOTDIST = False
 PLOTSCATTER = True
 VERBOSE = True
-ACCESSES = 10000
 
 class Pattern(Enum):
     RANDOM = auto()
@@ -32,7 +31,7 @@ class Distribution(Enum):
 class Config:
     """Config structure for memory access indexing""" 
     num_of_addresses: int
-    num_of_accesses: int = ACCESSES
+    num_of_accesses: int
     num_of_random: int = 0
     num_of_sequential: int = 0
     num_of_strided: int = 0
@@ -82,6 +81,8 @@ class Config:
                         self.strict = val.lower() == 'true'
                     case 'reuse_patterns':
                         self.reuse = val.lower() == 'true'
+                    case 'num_accesses':
+                        self.num_of_accesses = int(val)
                     case 'threads':
                         self.threads = int(val)
                     case _:

@@ -1,128 +1,202 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <pthread.h>
+#include "lib.h"
+#include "random.c"
 
-#include "memory.c"
-
-#define MAX_LINE_LENGTH 256
-#define NUMBERS_PER_LINE 20
-#define NUM_CONFIG_PARAMS 6
-#define VERBOSE 
-#define COLORS 4
-#define TEST
-
+#ifdef TEST
 const char *thread_colors[COLORS] = {
     "\033[31m", // red
     "\033[32m", // green
     "\033[33m", // yellow
-    "\033[34m"  // blue
+    "\033[34m",  // blue
+    "\033[4m",  // blue
 };
 const char *reset_color = "\033[0m";
+#endif
 
-typedef enum access_type {
-    rw,
-    r,
-} access_type;
-
-typedef struct {
-    int SIZE_MEMORY;
-    int SIZE_ELEMENTS;
-    int NUM_THREADS;
-    int NUM_ADDRESSES;
-    void (*access)(char*);
-} Config;
-
-typedef struct {
-    int thread_id;
-    FILE *file;
-    pthread_mutex_t *file_mutex;
-} ThreadData;
-
-typedef struct {
-    char *bytes;
-} Data;
-
-
-Data* data;
-Config cfg = {.SIZE_MEMORY=0, .SIZE_ELEMENTS=0, .NUM_THREADS=0, .NUM_ADDRESSES=0, .access=read_write};
 int shared_count = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+char* data;
+const uint32_t page_size;
+const uint64_t num_pages;
+const uint64_t accesses;
+uint64_t offset = 0;
 
-int allocate_data() {
-    data = (Data*)malloc(cfg.NUM_ADDRESSES * sizeof(Data));
-    if (data == NULL) {
-        printf("Memory allocation failed.\n");
-        return 0;
-    }
-    for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
-        data[i].bytes = (char*)malloc(cfg.SIZE_ELEMENTS * sizeof(char));
-        if (data[i].bytes == NULL) {
-            printf("Memory allocation failed.\n");
-            return 0;
-        }
-    }
-    return 1;
+Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.8, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
+                .SIZE_STRIDE=10 , .ratio_rand=0, .ratio_seq=10, .ratio_stride=0, .SIMULATE_GC = 0, .access=read_write};
+
+// int* indices;
+
+
+// void init_indices(int N) {
+//     indices = generate_indices(N);
+// }
+//int allocate_data() {
+//    data = (Data*)malloc(cfg.NUM_ADDRESSES * sizeof(Data));
+//    if (data == NULL) {
+//        printf("Memory allocation failed.\n");
+//        return 0;
+//    }
+//    for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
+//        data[i].bytes = (char*)malloc(cfg.SIZE_ELEMENTS * sizeof(char));
+//        if (data[i].bytes == NULL) {
+//            printf("Memory allocation failed.\n");
+//            return 0;
+//        }
+//    }
+//    return 1;
+//}
+
+// void initialize_data() {
+//     for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
+//         for (int j = 0; j < cfg.SIZE_ELEMENTS; j++) {
+//             data[i].bytes[j] = 0;
+//         }
+//     }
+// }
+
+void read_write(uint64_t index) {
+    char bytes[page_size];
+    pthread_mutex_lock(&count_mutex);
+    shared_count++;
+    pthread_mutex_unlock(&count_mutex);
+    
+    memcpy(bytes, &data[index * page_size], page_size);
+    memset(bytes, *bytes + 1, page_size);
+    memcpy(&data[index * page_size], bytes, page_size);
 }
 
-void initialize_data() {
-    for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
-        for (int j = 0; j < cfg.SIZE_ELEMENTS; j++) {
-            data[i].bytes[j] = 0;
-        }
-    }
+void read(uint64_t index) {
+    char bytes[page_size];
+    pthread_mutex_lock(&count_mutex);
+    shared_count++;
+    pthread_mutex_unlock(&count_mutex);
+
+    memcpy(bytes, &data[index * page_size], page_size);
 }
 
-void parse_numbers_from_line(const char *line, int *numbers, int *count) {
-    const char *ptr = line;
-    *count = 0;
+// void parse_numbers_from_line(const char *line, int *numbers, int *count) {
+//     const char *ptr = line;
+//     *count = 0;
 
-    while (*ptr) {
-        while (*ptr && !isdigit(*ptr)) {
-            ptr++;
-        }
-        if (*ptr && isdigit(*ptr)) {
-            numbers[*count] = strtol(ptr, (char **)&ptr, 10);
-            (*count)++;
-        }
-    }
-}
+//     while (*ptr) {
+//         while (*ptr && !isdigit(*ptr)) {
+//             ptr++;
+//         }
+//         if (*ptr && isdigit(*ptr)) {
+//             numbers[*count] = strtol(ptr, (char **)&ptr, 10);
+//             (*count)++;
+//         }
+//     }
+// }
 
 void read_config(FILE *file, Config *cfg) {
     char line[MAX_LINE_LENGTH];
-    int values[NUM_CONFIG_PARAMS];
-    int count = 0;
     
-    fgets(line, sizeof(line), file);
-    parse_numbers_from_line(line, values, &count);
-    
-    for (int i = 0; i < count; i++) {
-        switch (i) {
-            case 0:
-                cfg->SIZE_MEMORY = values[i];
-                break;
-            case 1:
-                cfg->SIZE_ELEMENTS = values[i];
-                break;
-            case 2:
-                cfg->NUM_THREADS = values[i];
-                break;
+    while (fgets(line, sizeof(line), file)) {
+        char key[MAX_LINE_LENGTH];
+        int value;
+
+        if (sscanf(line, "%s = %d", key, &value) == 2) {
+            if (strcmp(key, "pattern_strided") == 0) {
+                cfg->ratio_stride = value;
+            } else if (strcmp(key, "pattern_sequential") == 0) {
+                cfg->ratio_seq = value;
+            } else if (strcmp(key, "threads") == 0) {
+                cfg->NUM_THREADS = value;
+            } else if (strcmp(key, "pattern_random") == 0) {
+                cfg->ratio_rand = value;
+            } else {
+                fprintf(stderr, "Unknown option: %s\n", key);
+            }
         }
     }
-    cfg->NUM_ADDRESSES = cfg->SIZE_MEMORY / cfg->SIZE_ELEMENTS;
 }
 
-void access_memory(int address) {
-    for (int i = 0; i < cfg.SIZE_ELEMENTS; i++) {
-        cfg.access(&(data[address].bytes[i]));
+void read_vmstat() {
+    FILE *file = fopen("/proc/vmstat", "r");
+    if (!file) {
+        perror("Failed to open /proc/vmstat");
     }
+
+    char line[MAX_LINE_LENGTH];
+    static uint64_t swap_ra = 0;
+    static uint64_t swap_ra_hit = 0;
+    static uint64_t pgfault = 0;
+    static uint64_t pgmajfault = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        char key[MAX_LINE_LENGTH];
+        uint64_t value;
+
+        if (sscanf(line, "%s %lu", key, &value) == 2) {
+            if (strcmp(key, "swap_ra") == 0) {
+                if (swap_ra == 0) {
+                    swap_ra = value;
+                } else {
+                    swap_ra = value - swap_ra;
+                }
+            } else if (strcmp(key, "swap_ra_hit") == 0) {
+                if (swap_ra_hit == 0) {
+                   swap_ra_hit = value;
+                } else {
+                    swap_ra_hit = value - swap_ra_hit;
+                }
+            } else if (strcmp(key, "pgfault") == 0) {
+                if (pgfault == 0) {
+                    pgfault = value;
+                } else {
+                    pgfault = value - pgfault;
+                }
+            } else if (strcmp(key, "pgmajfault") == 0) {
+                if (pgmajfault == 0) {
+                    pgmajfault = value;
+                } else {
+                    pgmajfault = value - pgmajfault;
+                }
+            }
+        }
+    }
+
+    fclose(file);
+
+    printf("swap_ra: %lu\n", swap_ra);
+    printf("swap_ra_hit: %lu\n", swap_ra_hit);
+    printf("pgfault:t %lu\n", pgfault);
+    printf("pgmajfault:t %lu\n", pgmajfault);
+}
+
+void access_memory(uint64_t address, pattern_type pattern) {
+    switch (pattern) {
+    case SEQUENTIAL:
+        for (int i = 0; i < cfg.SIZE_SEQUENCE; i++) {
+            address = mod(address+i,num_pages);
+            cfg.access(address);
+        }
+        break;
+    case STRIDED:
+        for (int i = 0; i < cfg.SIZE_SEQUENCE*cfg.SIZE_STRIDE; i += cfg.SIZE_STRIDE) {
+            address = mod(address + i, num_pages);
+            cfg.access(address);
+        }
+        break;
+    case RANDOM:
+        cfg.access(address);
+        break;
+    }
+}
+
+uint64_t mod(uint64_t a, uint64_t b) {
+    uint64_t r = a % b;
+    return r < 0 ? r + b : r;
 }
 
 #ifdef TEST
-void print_address(int address, int thread_id) {
-    printf("%s%d%s ", thread_colors[thread_id % COLORS], address, reset_color);
+void print_address(int address, int thread_id, int miss) {
+    if (miss) {
+        printf("%s%s%d%s ", thread_colors[4],thread_colors[thread_id % COLORS], address, reset_color);
+    } else {
+        printf("%s%d%s ", thread_colors[thread_id % COLORS], address, reset_color);
+    }
 
     pthread_mutex_lock(&count_mutex);
     shared_count++;
@@ -130,34 +204,84 @@ void print_address(int address, int thread_id) {
         printf("\n");
     pthread_mutex_unlock(&count_mutex);
 }
+
+void print_addresses(int address, pattern_type pattern,int thread_id, int miss) {
+    switch (pattern)
+    {
+    case SEQUENTIAL:
+        for (int i = 0; i < cfg.SIZE_SEQUENCE; i++) {
+            print_address(mod(address+i,num_pages), thread_id, miss);
+        }
+        break;
+    case STRIDED:
+        for (int i = 0; i < cfg.SIZE_SEQUENCE*cfg.SIZE_STRIDE; i += cfg.SIZE_STRIDE) {
+            address = mod(address + (i), num_pages);
+            print_address(address, thread_id, miss);
+        }
+        break;
+    case RANDOM:
+        print_address(address, thread_id, miss);
+        break;
+    }
+}
 #endif
 
-void *process_lines(void *arg) {
+/* Compute the expected value of accesses needed such that every memory
+ * region is hit at least once (coupon collector's problem) */
+uint64_t compute_number_of_accesses() {
+    double num_cold = cfg.HOT_COLD_FRACTION * num_pages;
+	double accesses = (num_cold * harmonic(num_cold)) / cfg.HOT_RATE;
+	return (uint64_t) accesses;
+}
+
+/* Computes the number of pages needed to achieve the desired hit rate */
+uint64_t num_of_elements(uint64_t available_memory, uint32_t element_size, double hot_fraction, double hot_cold_ratio, double hit_rate) {
+	if (hot_cold_ratio >= hit_rate) {
+		printf("Hit rate should be larger than the hot/cold-ratio.");
+		return 0;
+	}
+	uint64_t available_elements, local_hot_elements, local_cold_elements, remote_cold_elements;
+	available_elements = available_memory / element_size;
+	local_hot_elements = available_elements * hot_fraction;
+	local_cold_elements = available_elements - local_hot_elements;
+	remote_cold_elements = (local_cold_elements * 
+			((1 - hot_cold_ratio) / (hit_rate - hot_cold_ratio)))
+	       		- local_cold_elements;
+	printf("local hot: %lu, local cold: %lu, available elements: %lu, remote cold: %lu\n", local_hot_elements, local_cold_elements,available_elements, remote_cold_elements);
+	return remote_cold_elements + available_elements;
+}
+
+void move_hot_region(int step) {
+    offset = uniform(num_pages);
+}
+
+void *do_access(void *arg) {
     ThreadData *thread = (ThreadData *)arg;
-    char line[MAX_LINE_LENGTH];
 
-    while (1) {
-        pthread_mutex_lock(thread->file_mutex);
-        if (!fgets(line, sizeof(line), thread->file)) {
-            // EoF
-            pthread_mutex_unlock(thread->file_mutex);
-            break;
+    while (shared_count < accesses) {
+        uint64_t page;
+        pattern_type pattern;
+        const uint64_t num_hot_pages = num_pages * cfg.HOT_COLD_FRACTION;
+        double hot_or_cold = uniform(1);
+        int hot = 1;
+        
+        if (hot_or_cold < cfg.HOT_RATE) {
+            page = uniform(num_hot_pages);
+            hot = 1;
+        } else {
+            page =uniform(num_pages - num_hot_pages) + num_hot_pages;
+            hot = 0;
         }
-        fgets(line, sizeof(line), thread->file);
-        pthread_mutex_unlock(thread->file_mutex);
-
-        int addresses[MAX_LINE_LENGTH];
-        int count = 0;
-        parse_numbers_from_line(line, addresses, &count);
-
-        for (int i = 0; i < count; i++) {
-#ifdef TEST
-        print_address(addresses[i], thread->thread_id);
-#endif
-#ifndef TEST
-        access_memory(addresses[i]);
-#endif
+        
+        page += offset;
+        
+        if (cfg.SIMULATE_GC && thread->thread_id == 0) {
+            pattern = RANDOM;
+        } else {
+            pattern = generate_pattern(cfg.ratio_seq, cfg.ratio_stride, cfg.ratio_rand);
         }
+        //print_addresses(page, pattern, thread->thread_id, hot);
+        access_memory(page, pattern);
     }
 
     return NULL;

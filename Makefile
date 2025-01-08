@@ -7,7 +7,7 @@ DBG = gdb
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 .PHONY: build-main
 build-main: build-dir
-	$(CC) -Wall -O0 -g -o build/main.o src/main.c
+	$(CC) -Wall -O0 -g -o build/main.o src/main.c src/lib.c src/memory.c -lm
 
 .PHONY: check
 check:
@@ -20,11 +20,11 @@ build-dir:
 
 .PHONY: build-test
 build-test: build-dir
-	$(CC) -Wall -O0 -g -o build/test.o src/test.c
+	$(CC) -Wall -O0 -g -o build/test.o src/test.c -lm
 
 .PHONY: run
 run: build-main
-	./build/main.o py/patterns/pattern_0_RANDOM
+	./build/main.o config
 
 .PHONY: test
 test: build-test
