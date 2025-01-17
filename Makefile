@@ -1,39 +1,33 @@
-# You can change these variables if you want to use a different compiler or debugger
-CC = gcc
-DBG = gdb
+TARGET = build/measure
+ARCH = $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/')
 
-# We use .PHONY to tell make to always run these commands even if a file exists
-# with the same name in this directory. For more information on .PHONY, see
-# https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-.PHONY: build-main
-build-main: build-dir
-	$(CC) -Wall -O0 -g -o build/main.o src/main.c src/lib.c src/memory.c -lm
+BPF_OBJ = ${TARGET:=.bpf.o}
+USER_C = src/main.c
+USER_SKEL = src/measure.skel.h
 
-.PHONY: check
-check:
-	@which $(CC) > /dev/null && echo "SUCCESS: $(CC) is installed" || echo "ERROR: $(CC) not found, please install clang"
-	@which $(DBG) > /dev/null && echo "SUCCESS: $(DBG) is installed" || echo "ERROR: $(DBG) not found, please install lldb"
+.PHONY: all 
 
-.PHONY: build-dir
-build-dir:
-	if [ ! -d build ]; then mkdir build; fi
+$(TARGET): $(USER_C) $(USER_SKEL) 
+	gcc -Wall -o $(TARGET) $(USER_C) src/lib.c src/memory.c -lm -l:libbpf.a -lelf -lz
+#	gcc -Wall -o $(TARGET) $(USER_C) -L../libbpf/src -l:libbpf.a -lelf -lz
 
-.PHONY: build-test
-build-test: build-dir
-	$(CC) -Wall -O0 -g -o build/test.o src/test.c -lm
+build/measure.bpf.o: src/measure.bpf.c vmlinux.h
+	clang \
+	    -target bpf \
+        -D __TARGET_ARCH_$(ARCH) \
+	    -Wall \
+	    -O2 -g -o $@ -c $<
+
+$(USER_SKEL): $(BPF_OBJ)
+	bpftool gen skeleton $< > $@
+
+vmlinux.h:
+	bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+
+clean:
+	- rm $(BPF_OBJ)
+	- rm $(TARGET)
 
 .PHONY: run
-run: build-main
-	./build/main.o config
-
-.PHONY: test
-test: build-test
-	./build/test.o
-
-.PHONY: debug
-debug: build-main
-	$(DBG) ./build/main.o
-
-.PHONY: debug-test
-debug-test: build-test
-	$(DBG) ./build/test.o
+run: $(TARGET)
+	./build/measure config
