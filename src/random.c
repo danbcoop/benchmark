@@ -27,6 +27,11 @@ double harmonic(int n) {
 	}
 	return H;
 }
+
 int uniform(int N) {
     return ((double)rand()/RAND_MAX)*N;
+}
+
+double uniform_double() {
+    return ((double)rand()/RAND_MAX);
 }

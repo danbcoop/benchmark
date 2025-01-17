@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
 
+#include <ctype.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <pthread.h>
-#include <unistd.h> //Sysconf
 #include <sys/mman.h>
+#include <unistd.h> //Sysconf
 
-#include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <bpf/libbpf.h>
 #include "measure.skel.h"
 
 #include "lib.h"
@@ -42,22 +42,22 @@ int main(int argc, char *argv[]) {
                     cfg.NUM_THREADS, cfg.ratio_rand, cfg.ratio_seq, cfg.ratio_stride);
 #endif
 
-    struct measure_bpf *skel;
+     struct measure_bpf *skel;
 
-    /* Load BPF program */
-    skel = measure_bpf__open_and_load();
-    if (!skel) {
-        printf("Failed to open and load BPF program\n");
-        return 1;
-    }
+     /* Load BPF program */
+     skel = measure_bpf__open_and_load();
+     if (!skel) {
+         printf("Failed to open and load BPF program\n");
+         return 1;
+     }
     
-    /* Attach BPF program */
-    int err = measure_bpf__attach(skel);
-    if (err) {
-        printf("Failed to attach BPF program: %d\n", err);
-        measure_bpf__destroy(skel);
-        return 1;
-    }
+     /* Attach BPF program */
+     int err = measure_bpf__attach(skel);
+     if (err) {
+         printf("Failed to attach BPF program: %d\n", err);
+         measure_bpf__destroy(skel);
+         return 1;
+     }
 
 #ifndef TEST
     clear_cache();
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     page_size = sysconf(_SC_PAGESIZE);
 	uint64_t available_memory = sysconf(_SC_AVPHYS_PAGES) * page_size;
     num_pages = num_of_elements(available_memory, page_size, cfg.HOT_COLD_FRACTION, cfg.HOT_RATE, cfg.HIT_RATE);
-    
+
     data = mmap(NULL, (num_pages * page_size), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (data == MAP_FAILED) {
         printf("mmap() failed\n");
@@ -103,9 +103,11 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < cfg.NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
+    move_hot_region();
 
+    /* Detach and unload BPF program */
     measure_bpf__destroy(skel);
-    
+
     printf("\n %lu pages used.\n", num_pages);
     printf("\n %lu pages accessed.\n", accesses);
     printf("Memory available: %luMi\n", available_memory/1024/1024);
@@ -118,10 +120,10 @@ int main(int argc, char *argv[]) {
     char buf[MAX_LINE_LENGTH];
     file = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
     if (file) {
-        while (fgets(buf, sizeof(buf), file)) {
-            printf("%s", buf);
-        }
-        fclose(file);
+    	while (fgets(buf, sizeof(buf), file)) {
+    		printf("%s", buf);
+    	}
+    	fclose(file);
     }
     return 0;
 }

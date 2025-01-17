@@ -16,12 +16,12 @@ int shared_count = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 char* data;
-const uint32_t page_size;
-const uint64_t num_pages;
-const uint64_t accesses;
+uint32_t page_size;
+uint64_t num_pages;
+uint64_t accesses;
 uint64_t offset = 0;
 
-Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.8, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
+Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.7, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
                 .SIZE_STRIDE=10 , .ratio_rand=0, .ratio_seq=10, .ratio_stride=0, .SIMULATE_GC = 0, .access=read_write};
 
 // int* indices;
@@ -251,7 +251,7 @@ uint64_t num_of_elements(uint64_t available_memory, uint32_t element_size, doubl
 	return remote_cold_elements + available_elements;
 }
 
-void move_hot_region(int step) {
+void move_hot_region() {
     offset = uniform(num_pages);
 }
 
@@ -262,15 +262,15 @@ void *do_access(void *arg) {
         uint64_t page;
         pattern_type pattern;
         const uint64_t num_hot_pages = num_pages * cfg.HOT_COLD_FRACTION;
-        double hot_or_cold = uniform(1);
-        int hot = 1;
-        
+        double hot_or_cold = uniform_double();
+        int hot = 0;
+
         if (hot_or_cold < cfg.HOT_RATE) {
             page = uniform(num_hot_pages);
-            hot = 1;
+	    hot = 1;
         } else {
             page =uniform(num_pages - num_hot_pages) + num_hot_pages;
-            hot = 0;
+	    hot = 0;
         }
         
         page += offset;
@@ -280,8 +280,8 @@ void *do_access(void *arg) {
         } else {
             pattern = generate_pattern(cfg.ratio_seq, cfg.ratio_stride, cfg.ratio_rand);
         }
-        //print_addresses(page, pattern, thread->thread_id, hot);
-        access_memory(page, pattern);
+        print_addresses(page, pattern, thread->thread_id, hot);
+        // access_memory(page, pattern);
     }
 
     return NULL;

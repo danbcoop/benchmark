@@ -33,7 +33,6 @@ int BPF_KRETPROBE(handle_mm_fault_exit) {
 
     bpf_printk("Page fault handling time: %llu ns\n", delta);
 
-    // Clean up
     bpf_map_delete_elem(&start_time, &pid);
     return 0;
 }
