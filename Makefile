@@ -27,6 +27,7 @@ vmlinux.h:
 clean:
 	- rm $(BPF_OBJ)
 	- rm $(TARGET)
+	- rm vmlinux.h
 
 .PHONY: run
 run: $(TARGET)
