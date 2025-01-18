@@ -114,55 +114,66 @@ void read_config(FILE *file, Config *cfg) {
 
 void read_vmstat() {
     FILE *file = fopen("/proc/vmstat", "r");
+    time_t now = time(NULL);
+    FILE *file_out;
+    char filename[MAX_LINE_LENGTH];
+    
+    struct tm *t = localtime(&now);
+    strftime(filename, sizeof(filename), "vmstat_%m%d_%H%M%S.txt", t);
+    file_out = fopen(filename, "w");
     if (!file) {
         perror("Failed to open /proc/vmstat");
     }
 
     char line[MAX_LINE_LENGTH];
-    static uint64_t swap_ra = 0;
-    static uint64_t swap_ra_hit = 0;
-    static uint64_t pgfault = 0;
-    static uint64_t pgmajfault = 0;
+    // static uint64_t swap_ra = 0;
+    // static uint64_t swap_ra_hit = 0;
+    // static uint64_t pgfault = 0;
+    // static uint64_t pgmajfault = 0;
 
     while (fgets(line, sizeof(line), file)) {
-        char key[MAX_LINE_LENGTH];
-        uint64_t value;
+    		fprintf(file_out, "%s", line);
 
-        if (sscanf(line, "%s %lu", key, &value) == 2) {
-            if (strcmp(key, "swap_ra") == 0) {
-                if (swap_ra == 0) {
-                    swap_ra = value;
-                } else {
-                    swap_ra = value - swap_ra;
-                }
-            } else if (strcmp(key, "swap_ra_hit") == 0) {
-                if (swap_ra_hit == 0) {
-                   swap_ra_hit = value;
-                } else {
-                    swap_ra_hit = value - swap_ra_hit;
-                }
-            } else if (strcmp(key, "pgfault") == 0) {
-                if (pgfault == 0) {
-                    pgfault = value;
-                } else {
-                    pgfault = value - pgfault;
-                }
-            } else if (strcmp(key, "pgmajfault") == 0) {
-                if (pgmajfault == 0) {
-                    pgmajfault = value;
-                } else {
-                    pgmajfault = value - pgmajfault;
-                }
-            }
-        }
+        
+        // char key[MAX_LINE_LENGTH];
+        // uint64_t value;
+
+        // if (sscanf(line, "%s %lu", key, &value) == 2) {
+        //     if (strcmp(key, "swap_ra") == 0) {
+        //         if (swap_ra == 0) {
+        //             swap_ra = value;
+        //         } else {
+        //             swap_ra = value - swap_ra;
+        //         }
+        //     } else if (strcmp(key, "swap_ra_hit") == 0) {
+        //         if (swap_ra_hit == 0) {
+        //            swap_ra_hit = value;
+        //         } else {
+        //             swap_ra_hit = value - swap_ra_hit;
+        //         }
+        //     } else if (strcmp(key, "pgfault") == 0) {
+        //         if (pgfault == 0) {
+        //             pgfault = value;
+        //         } else {
+        //             pgfault = value - pgfault;
+        //         }
+        //     } else if (strcmp(key, "pgmajfault") == 0) {
+        //         if (pgmajfault == 0) {
+        //             pgmajfault = value;
+        //         } else {
+        //             pgmajfault = value - pgmajfault;
+        //         }
+        //     }
+        // }
     }
 
     fclose(file);
+    fclose(file_out);
 
-    printf("swap_ra: %lu\n", swap_ra);
-    printf("swap_ra_hit: %lu\n", swap_ra_hit);
-    printf("pgfault: %lu\n", pgfault);
-    printf("pgmajfault: %lu\n", pgmajfault);
+    // printf("swap_ra: %lu\n", swap_ra);
+    // printf("swap_ra_hit: %lu\n", swap_ra_hit);
+    // printf("pgfault: %lu\n", pgfault);
+    // printf("pgmajfault: %lu\n", pgmajfault);
 }
 
 void access_memory(uint64_t address, pattern_type pattern) {

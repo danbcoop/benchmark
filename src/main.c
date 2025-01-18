@@ -8,6 +8,8 @@
 #include <sys/mman.h>
 #include <unistd.h> //Sysconf
 
+#include <sys/select.h>
+
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include "measure.skel.h"
@@ -113,29 +115,43 @@ int main(int argc, char *argv[]) {
     printf("Memory used: %luMi\n", num_pages*page_size/1024/1024);
     
     /* Print vmstat */
-    read_vmstat();
+    // read_vmstat();
     
     /* Print page fault handling times */
     char filename[MAX_LINE_LENGTH];
-    char buf[MAX_LINE_LENGTH];
+    char line[MAX_LINE_LENGTH];
     time_t now = time(NULL);
     FILE *file_out;
     struct tm *t = localtime(&now);
-    strftime(filename, sizeof(filename), "time-delta_%Y%m%d_%H%M%S.txt", t);
+    strftime(filename, sizeof(filename), "time-delta_%m%d_%H%M%S.txt", t);
     file_out = fopen(filename, "w");
     if (!file_out) {
         perror("Failed to create output file");
         return 1;
     }
-    file = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
+    FILE *pipe = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
 
-    if (file) {
-    	while (fgets(buf, sizeof(buf), file)) {
-    		fprintf(file_out, "%s", buf);
-    	}
-    	fclose(file);
+    if (pipe) {
+        int file_fd = fileno(pipe); // Get the file descriptor for the pipe
+        while (1) { /* trace_pipe does not have an EOF, thus we have to use a timeout */
+            fd_set read_fd_set;
+            struct timeval timeout;
+
+            FD_ZERO(&read_fd_set);
+            FD_SET(file_fd, &read_fd_set);
+            timeout.tv_sec = 3;
+            timeout.tv_usec = 0;
+
+            int ready = select(file_fd + 1, &read_fd_set, NULL, NULL, &timeout);
+            if (ready == 0) /* timeout */
+                break;
+            
+            if (fgets(line, sizeof(line), pipe))
+                fprintf(file_out, "%s", line);
+        }
+        fclose(pipe);
+        printf("time deltas written to file.\n");
     }
     fclose(file_out);
-
     return 0;
 }
