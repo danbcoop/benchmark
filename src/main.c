@@ -28,8 +28,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const char *filename = argv[1];
-    FILE *file = fopen(filename, "r");
+    const char *filename_cfg = argv[1];
+    FILE *file = fopen(filename_cfg, "r");
     if (!file) {
         printf("Error opening file");
         return 1;
@@ -95,7 +95,6 @@ int main(int argc, char *argv[]) {
 
         if (pthread_create(&threads[i], NULL, do_access, &thread_data[i]) != 0) {
             printf("Thread creation failed.");
-            fclose(file);
             return 1;
         }
     }
@@ -117,13 +116,26 @@ int main(int argc, char *argv[]) {
     read_vmstat();
     
     /* Print page fault handling times */
+    char filename[MAX_LINE_LENGTH];
     char buf[MAX_LINE_LENGTH];
+    time_t now = time(NULL);
+    FILE *file_out;
+    struct tm *t = localtime(&now);
+    strftime(filename, sizeof(filename), "time-delta_%Y%m%d_%H%M%S.txt", t);
+    file_out = fopen(filename, "w");
+    if (!file_out) {
+        perror("Failed to create output file");
+        return 1;
+    }
     file = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
+
     if (file) {
     	while (fgets(buf, sizeof(buf), file)) {
-    		printf("%s", buf);
+    		fprintf(file_out, "%s", buf);
     	}
     	fclose(file);
     }
+    fclose(file_out);
+
     return 0;
 }

@@ -161,8 +161,8 @@ void read_vmstat() {
 
     printf("swap_ra: %lu\n", swap_ra);
     printf("swap_ra_hit: %lu\n", swap_ra_hit);
-    printf("pgfault:t %lu\n", pgfault);
-    printf("pgmajfault:t %lu\n", pgmajfault);
+    printf("pgfault: %lu\n", pgfault);
+    printf("pgmajfault: %lu\n", pgmajfault);
 }
 
 void access_memory(uint64_t address, pattern_type pattern) {
