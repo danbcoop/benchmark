@@ -23,17 +23,23 @@ SEC("kretprobe/handle_mm_fault")
 int BPF_KRETPROBE(handle_mm_fault_exit) {
     pid_t pid = bpf_get_current_pid_tgid() >> 32;
     u64 *start_ts, end_ts, delta;
+    char comm[TASK_COMM_LEN];
 
     start_ts = bpf_map_lookup_elem(&start_time, &pid);
     if (!start_ts)
         return 0;
 
+    bpf_map_delete_elem(&start_time, &pid);
+
     end_ts = bpf_ktime_get_ns();
     delta = end_ts - *start_ts;
 
-    bpf_printk("Page fault handling time: %llu ns", delta);
+    if (bpf_get_current_comm(comm, TASK_COMM_LEN))
+	    return 0; /* Reading 'task comm' failed */
 
-    bpf_map_delete_elem(&start_time, &pid);
+    if (bpf_strncmp(comm, 7, "measure") == 0)
+	    bpf_printk("%llu ns", delta);
+
     return 0;
 }
 
