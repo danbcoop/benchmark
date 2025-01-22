@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
     
     read_config(file, &cfg);
     fclose(file);
+    init_output();
 #ifdef VERBOSE
         printf("Config:\n\tThreads: %d\tRand: %d\n\tSeq: %d\tStride: %d\n", 
                     cfg.NUM_THREADS, cfg.ratio_rand, cfg.ratio_seq, cfg.ratio_stride);
@@ -85,7 +86,7 @@ int main(int argc, char *argv[]) {
     }
 #endif
     accesses = compute_number_of_accesses()*2;
-    read_vmstat();
+
     pthread_t threads[cfg.NUM_THREADS];
     ThreadData thread_data[cfg.NUM_THREADS];
 
@@ -114,44 +115,42 @@ int main(int argc, char *argv[]) {
     printf("Memory available: %luMi\n", available_memory/1024/1024);
     printf("Memory used: %luMi\n", num_pages*page_size/1024/1024);
     
-    /* Print vmstat */
-    // read_vmstat();
     
-    /* Print page fault handling times */
-    char filename[MAX_LINE_LENGTH];
-    char line[MAX_LINE_LENGTH];
-    time_t now = time(NULL);
-    FILE *file_out;
-    struct tm *t = localtime(&now);
-    strftime(filename, sizeof(filename), "time-delta_%m%d_%H%M%S.txt", t);
-    file_out = fopen(filename, "w");
-    if (!file_out) {
-        perror("Failed to create output file");
-        return 1;
-    }
-    FILE *pipe = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
+    // /* Print page fault handling times */
+    // char filename[MAX_LINE_LENGTH];
+    // char line[MAX_LINE_LENGTH];
+    // time_t now = time(NULL);
+    // FILE *file_out;
+    // struct tm *t = localtime(&now);
+    // strftime(filename, sizeof(filename), "time-delta_%m%d_%H%M%S.txt", t);
+    // file_out = fopen(filename, "w");
+    // if (!file_out) {
+    //     perror("Failed to create output file");
+    //     return 1;
+    // }
+    // FILE *pipe = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
 
-    if (pipe) {
-        int file_fd = fileno(pipe); // Get the file descriptor for the pipe
-        while (1) { /* trace_pipe does not have an EOF, thus we have to use a timeout */
-            fd_set read_fd_set;
-            struct timeval timeout;
+    // if (pipe) {
+    //     int file_fd = fileno(pipe); // Get the file descriptor for the pipe
+    //     while (1) { /* trace_pipe does not have an EOF, thus we have to use a timeout */
+    //         fd_set read_fd_set;
+    //         struct timeval timeout;
 
-            FD_ZERO(&read_fd_set);
-            FD_SET(file_fd, &read_fd_set);
-            timeout.tv_sec = 3;
-            timeout.tv_usec = 0;
+    //         FD_ZERO(&read_fd_set);
+    //         FD_SET(file_fd, &read_fd_set);
+    //         timeout.tv_sec = 3;
+    //         timeout.tv_usec = 0;
 
-            int ready = select(file_fd + 1, &read_fd_set, NULL, NULL, &timeout);
-            if (ready == 0) /* timeout */
-                break;
+    //         int ready = select(file_fd + 1, &read_fd_set, NULL, NULL, &timeout);
+    //         if (ready == 0) /* timeout */
+    //             break;
             
-            if (fgets(line, sizeof(line), pipe))
-                fprintf(file_out, "%s", line);
-        }
-        fclose(pipe);
-        printf("time deltas written to file.\n");
-    }
-    fclose(file_out);
+    //         if (fgets(line, sizeof(line), pipe))
+    //             fprintf(file_out, "%s", line);
+    //     }
+    //     fclose(pipe);
+    //     printf("time deltas written to file.\n");
+    // }
+    // fclose(file_out);
     return 0;
 }

@@ -20,6 +20,7 @@ uint32_t page_size;
 uint64_t num_pages;
 uint64_t accesses;
 uint64_t offset = 0;
+FILE *file_out;
 
 Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.7, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
                 .SIZE_STRIDE=10 , .ratio_rand=0, .ratio_seq=10, .ratio_stride=0, .SIMULATE_GC = 0, .access=read_write};
@@ -58,6 +59,9 @@ void read_write(uint64_t index) {
     char bytes[page_size];
     pthread_mutex_lock(&count_mutex);
     shared_count++;
+    if ((shared_count & (TRACE_BUFFER-1)) == 0) {
+	    write_time_deltas();
+    }
     pthread_mutex_unlock(&count_mutex);
     
     memcpy(bytes, &data[index * page_size], page_size);
@@ -88,6 +92,22 @@ void read(uint64_t index) {
 //         }
 //     }
 // }
+void write_time_deltas() {
+    FILE *pipe = fopen("/sys/kernel/debug/tracing/trace", "r");
+    char line[MAX_LINE_LENGTH];
+
+    if (pipe) {
+	    while (fgets(line, sizeof(line), pipe)) {
+    		fprintf(file_out, "%s", line);
+	     }
+        fclose(pipe);
+    }
+    
+    /* Clear 'trace' */
+	FILE *f = fopen("/sys/kernel/debug/tracing/trace", "w");
+	fprintf(f,"\n");
+	fclose(f);
+}
 
 void read_config(FILE *file, Config *cfg) {
     char line[MAX_LINE_LENGTH];
@@ -110,6 +130,19 @@ void read_config(FILE *file, Config *cfg) {
             }
         }
     }
+}
+
+void init_output() {
+    char filename_output[MAX_LINE_LENGTH];
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(filename_output, sizeof(filename_output), "time-delta_%m%d_%H%M%S.txt", t);
+    file_out = fopen(filename_output, "w");
+    if (!file_out) {
+        perror("Failed to create output file");
+    }
+    
+    read_vmstat();
 }
 
 void read_vmstat() {
