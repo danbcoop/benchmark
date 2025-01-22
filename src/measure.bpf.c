@@ -12,7 +12,7 @@ struct {
 
 SEC("kprobe/handle_mm_fault")
 int BPF_KPROBE(handle_mm_fault_entry) {
-    pid_t pid = bpf_get_current_pid_tgid() >> 32;
+    pid_t pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
     u64 ts = bpf_ktime_get_ns();
 
     bpf_map_update_elem(&start_time, &pid, &ts, BPF_ANY);
@@ -21,7 +21,7 @@ int BPF_KPROBE(handle_mm_fault_entry) {
 
 SEC("kretprobe/handle_mm_fault")
 int BPF_KRETPROBE(handle_mm_fault_exit) {
-    pid_t pid = bpf_get_current_pid_tgid() >> 32;
+    pid_t pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF;
     u64 *start_ts, end_ts, delta;
     char comm[TASK_COMM_LEN];
 
