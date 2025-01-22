@@ -1,10 +1,12 @@
 # Set the distribution of memory accesses
-distribution = UNIFORM # ZIPFIAN (default), UNIFORM
-#zipfian_alpha = 1.000001 # float >1
 
 # Set number of patterns with own hot region
 num_epochs = 1
-num_accesses = 10000 # number of memory accesses during an epoch
+
+# Memory settings
+hot_ratio = 0.2 # Set the fraction of hot pages to cold pages in memory
+hot_frequency = 0.6 # Set the access frequency of hot pages
+hit_rate = 0.8 # Set the hit rate of a page access
 
 # Set relative share of acces pattern in percent (should add up to 100)
 pattern_strided = 0
@@ -12,19 +14,13 @@ pattern_sequential = 100
 pattern_random = 0
 pattern_ladder = 0
 
-# Not all access adresses can be fit into a specific pattern and still be of zipfian distribution.
-# If you want to drop any access indices that don't fit into the pattern, set strict_patterns = true.
-strict_patterns = true # true/false
-
 param_stride = 3
 param_pattern_length = 8
 
-size_of_element = 16*1024
+# size_of_element = 16*1024
 
 memory = 2*1024*1024
 threads = 4 
 
 access_type = rw # r, rw
 
-# If you don't want to generate new memory access patterns: reuse_patterns=true.
-reuse_patterns = false # true/false
