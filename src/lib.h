@@ -13,8 +13,7 @@
 #define TEST
 #define NUMA_NODE_LOCAL 0
 #define TRACE_BUFFER 1024
-
-
+// #define BPF
 
 
 typedef enum access_type {
@@ -38,6 +37,10 @@ typedef struct {
 
 typedef struct {
     int thread_id;
+    uint64_t offset;
+    uint64_t num_of_pages;
+    uint64_t accesses;
+    uint64_t index;
 } ThreadData;
 
 typedef struct {

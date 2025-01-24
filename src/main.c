@@ -41,26 +41,28 @@ int main(int argc, char *argv[]) {
     fclose(file);
     init_output();
 #ifdef VERBOSE
-        printf("Config:\n\tThreads: %d\tRand: %d\n\tSeq: %d\tStride: %d\n", 
-                    cfg.NUM_THREADS, cfg.ratio_rand, cfg.ratio_seq, cfg.ratio_stride);
+    printf("Config:\n\tThreads: %d\tRand: %d\n\tSeq: %d\tStride: %d\n", 
+            cfg.NUM_THREADS, cfg.ratio_rand, cfg.ratio_seq, cfg.ratio_stride);
 #endif
 
-     struct measure_bpf *skel;
+#ifdef BPF
+    struct measure_bpf *skel;
 
-     /* Load BPF program */
-     skel = measure_bpf__open_and_load();
-     if (!skel) {
-         printf("Failed to open and load BPF program\n");
-         return 1;
-     }
-    
-     /* Attach BPF program */
-     int err = measure_bpf__attach(skel);
-     if (err) {
-         printf("Failed to attach BPF program: %d\n", err);
-         measure_bpf__destroy(skel);
-         return 1;
-     }
+    /* Load BPF program */
+    skel = measure_bpf__open_and_load();
+    if (!skel) {
+        printf("Failed to open and load BPF program\n");
+        return 1;
+    }
+
+    /* Attach BPF program */
+    int err = measure_bpf__attach(skel);
+    if (err) {
+        printf("Failed to attach BPF program: %d\n", err);
+        measure_bpf__destroy(skel);
+        return 1;
+    }
+#endif
 
 #ifndef TEST
     clear_cache();
@@ -77,7 +79,8 @@ int main(int argc, char *argv[]) {
     clear_cache();
     page_size = sysconf(_SC_PAGESIZE);
 	uint64_t available_memory = sysconf(_SC_AVPHYS_PAGES) * page_size;
-    num_pages = num_of_elements(available_memory, page_size, cfg.HOT_COLD_FRACTION, cfg.HOT_RATE, cfg.HIT_RATE);
+    num_pages = sysconf(_SC_AVPHYS_PAGES) - sysconf(_SC_AVPHYS_PAGES) % cfg.NUM_THREADS;
+    accesses = num_pages * 4;
 
     data = mmap(NULL, (num_pages * page_size), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (data == MAP_FAILED) {
@@ -85,8 +88,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 #endif
-    accesses = compute_number_of_accesses()*2;
-
+    
     pthread_t threads[cfg.NUM_THREADS];
     ThreadData thread_data[cfg.NUM_THREADS];
 
@@ -95,6 +97,10 @@ int main(int argc, char *argv[]) {
     
     for (int i = 0; i < cfg.NUM_THREADS; i++) {
         thread_data[i].thread_id = i;
+        thread_data[i].num_of_pages = num_pages / cfg.NUM_THREADS; // we made sure that num_pages is alwas divisible by #threads
+        thread_data[i].offset = i * (thread_data[i].num_of_pages);
+        thread_data[i].accesses = thread_data[i].num_of_pages * 3;
+        thread_data[i].index = 0;
 
         if (pthread_create(&threads[i], NULL, do_access, &thread_data[i]) != 0) {
             printf("Thread creation failed.");
@@ -105,52 +111,16 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < cfg.NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
-    move_hot_region();
 
+#ifdef BPF
     /* Detach and unload BPF program */
     measure_bpf__destroy(skel);
+#endif
 
     printf("\n %lu pages used.\n", num_pages);
     printf("\n %lu pages accessed.\n", accesses);
     printf("Memory available: %luMi\n", available_memory/1024/1024);
     printf("Memory used: %luMi\n", num_pages*page_size/1024/1024);
-    
-    
-    // /* Print page fault handling times */
-    // char filename[MAX_LINE_LENGTH];
-    // char line[MAX_LINE_LENGTH];
-    // time_t now = time(NULL);
-    // FILE *file_out;
-    // struct tm *t = localtime(&now);
-    // strftime(filename, sizeof(filename), "time-delta_%m%d_%H%M%S.txt", t);
-    // file_out = fopen(filename, "w");
-    // if (!file_out) {
-    //     perror("Failed to create output file");
-    //     return 1;
-    // }
-    // FILE *pipe = fopen("/sys/kernel/debug/tracing/trace_pipe", "r");
 
-    // if (pipe) {
-    //     int file_fd = fileno(pipe); // Get the file descriptor for the pipe
-    //     while (1) { /* trace_pipe does not have an EOF, thus we have to use a timeout */
-    //         fd_set read_fd_set;
-    //         struct timeval timeout;
-
-    //         FD_ZERO(&read_fd_set);
-    //         FD_SET(file_fd, &read_fd_set);
-    //         timeout.tv_sec = 3;
-    //         timeout.tv_usec = 0;
-
-    //         int ready = select(file_fd + 1, &read_fd_set, NULL, NULL, &timeout);
-    //         if (ready == 0) /* timeout */
-    //             break;
-            
-    //         if (fgets(line, sizeof(line), pipe))
-    //             fprintf(file_out, "%s", line);
-    //     }
-    //     fclose(pipe);
-    //     printf("time deltas written to file.\n");
-    // }
-    // fclose(file_out);
     return 0;
 }

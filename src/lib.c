@@ -25,43 +25,16 @@ FILE *file_out;
 Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.7, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
                 .SIZE_STRIDE=10 , .ratio_rand=0, .ratio_seq=10, .ratio_stride=0, .SIMULATE_GC = 1, .access=read_write};
 
-// int* indices;
-
-
-// void init_indices(int N) {
-//     indices = generate_indices(N);
-// }
-//int allocate_data() {
-//    data = (Data*)malloc(cfg.NUM_ADDRESSES * sizeof(Data));
-//    if (data == NULL) {
-//        printf("Memory allocation failed.\n");
-//        return 0;
-//    }
-//    for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
-//        data[i].bytes = (char*)malloc(cfg.SIZE_ELEMENTS * sizeof(char));
-//        if (data[i].bytes == NULL) {
-//            printf("Memory allocation failed.\n");
-//            return 0;
-//        }
-//    }
-//    return 1;
-//}
-
-// void initialize_data() {
-//     for (int i = 0; i < cfg.NUM_ADDRESSES; i++) {
-//         for (int j = 0; j < cfg.SIZE_ELEMENTS; j++) {
-//             data[i].bytes[j] = 0;
-//         }
-//     }
-// }
 
 void read_write(uint64_t index) {
     char bytes[page_size];
     pthread_mutex_lock(&count_mutex);
     shared_count++;
+#ifdef BPF
     if ((shared_count & (TRACE_BUFFER-1)) == 0) {
 	    write_time_deltas();
     }
+#endif
     pthread_mutex_unlock(&count_mutex);
     
     memcpy(bytes, &data[index * page_size], page_size);
@@ -78,20 +51,6 @@ void read(uint64_t index) {
     memcpy(bytes, &data[index * page_size], page_size);
 }
 
-// void parse_numbers_from_line(const char *line, int *numbers, int *count) {
-//     const char *ptr = line;
-//     *count = 0;
-
-//     while (*ptr) {
-//         while (*ptr && !isdigit(*ptr)) {
-//             ptr++;
-//         }
-//         if (*ptr && isdigit(*ptr)) {
-//             numbers[*count] = strtol(ptr, (char **)&ptr, 10);
-//             (*count)++;
-//         }
-//     }
-// }
 void write_time_deltas() {
     FILE *pipe = fopen("/sys/kernel/debug/tracing/trace", "r");
     char line[MAX_LINE_LENGTH];
@@ -159,54 +118,13 @@ void read_vmstat() {
     }
 
     char line[MAX_LINE_LENGTH];
-    // static uint64_t swap_ra = 0;
-    // static uint64_t swap_ra_hit = 0;
-    // static uint64_t pgfault = 0;
-    // static uint64_t pgmajfault = 0;
 
     while (fgets(line, sizeof(line), file)) {
     		fprintf(file_out, "%s", line);
-
-        
-        // char key[MAX_LINE_LENGTH];
-        // uint64_t value;
-
-        // if (sscanf(line, "%s %lu", key, &value) == 2) {
-        //     if (strcmp(key, "swap_ra") == 0) {
-        //         if (swap_ra == 0) {
-        //             swap_ra = value;
-        //         } else {
-        //             swap_ra = value - swap_ra;
-        //         }
-        //     } else if (strcmp(key, "swap_ra_hit") == 0) {
-        //         if (swap_ra_hit == 0) {
-        //            swap_ra_hit = value;
-        //         } else {
-        //             swap_ra_hit = value - swap_ra_hit;
-        //         }
-        //     } else if (strcmp(key, "pgfault") == 0) {
-        //         if (pgfault == 0) {
-        //             pgfault = value;
-        //         } else {
-        //             pgfault = value - pgfault;
-        //         }
-        //     } else if (strcmp(key, "pgmajfault") == 0) {
-        //         if (pgmajfault == 0) {
-        //             pgmajfault = value;
-        //         } else {
-        //             pgmajfault = value - pgmajfault;
-        //         }
-        //     }
-        // }
     }
 
     fclose(file);
     fclose(file_out);
-
-    // printf("swap_ra: %lu\n", swap_ra);
-    // printf("swap_ra_hit: %lu\n", swap_ra_hit);
-    // printf("pgfault: %lu\n", pgfault);
-    // printf("pgmajfault: %lu\n", pgmajfault);
 }
 
 void access_memory(uint64_t address, pattern_type pattern) {
@@ -302,29 +220,13 @@ void move_hot_region() {
 void *do_access(void *arg) {
     ThreadData *thread = (ThreadData *)arg;
 
-    while (shared_count < accesses) {
-        uint64_t page;
-        pattern_type pattern;
-        const uint64_t num_hot_pages = num_pages * cfg.HOT_COLD_FRACTION;
-        double hot_or_cold = uniform_double();
-        int hot = 0;
-
-        if (hot_or_cold < cfg.HOT_RATE) {
-            page = uniform(num_hot_pages);
-	    hot = 1;
-        } else {
-            page =uniform(num_pages - num_hot_pages) + num_hot_pages;
-	    hot = 0;
-        }
+    while (thread->accesses) {
+        uint64_t address;
+        (thread->accesses)--;
+        address = mod(thread->index, thread->num_of_pages) + thread->offset;
+        (thread->index)++;
         
-        page += offset;
-        
-        if (cfg.SIMULATE_GC && thread->thread_id == 0) {
-            pattern = RANDOM;
-        } else {
-            pattern = generate_pattern(cfg.ratio_seq, cfg.ratio_stride, cfg.ratio_rand);
-        }
-        print_addresses(page, pattern, thread->thread_id, hot);
+        print_address(address, thread->thread_id, 0);
         // access_memory(page, pattern);
     }
 
