@@ -23,7 +23,7 @@ uint64_t offset = 0;
 FILE *file_out;
 
 Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.7, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
-                .SIZE_STRIDE=10 , .ratio_rand=0, .ratio_seq=10, .ratio_stride=0, .SIMULATE_GC = 0, .access=read_write};
+                .SIZE_STRIDE=10 , .ratio_rand=0, .ratio_seq=10, .ratio_stride=0, .SIMULATE_GC = 1, .access=read_write};
 
 // int* indices;
 
@@ -213,14 +213,14 @@ void access_memory(uint64_t address, pattern_type pattern) {
     switch (pattern) {
     case SEQUENTIAL:
         for (int i = 0; i < cfg.SIZE_SEQUENCE; i++) {
-            address = mod(address+i,num_pages);
-            cfg.access(address);
+            int addr = mod(address+i,num_pages);
+            cfg.access(addr);
         }
         break;
     case STRIDED:
         for (int i = 0; i < cfg.SIZE_SEQUENCE*cfg.SIZE_STRIDE; i += cfg.SIZE_STRIDE) {
-            address = mod(address + i, num_pages);
-            cfg.access(address);
+            int addr = mod(address + i, num_pages);
+            cfg.access(addr);
         }
         break;
     case RANDOM:
