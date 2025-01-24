@@ -28,6 +28,8 @@ double harmonic(int n) {
 	return H;
 }
 
+/* Returns a uniformly distributed number between 0 and N, excluding N:
+ * [0, N) */
 int uniform(int N) {
     return ((double)rand()/RAND_MAX)*N;
 }

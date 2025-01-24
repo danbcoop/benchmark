@@ -28,14 +28,6 @@ Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.7, .NUM_THREADS
 
 void read_write(uint64_t index) {
     char bytes[page_size];
-    pthread_mutex_lock(&count_mutex);
-    shared_count++;
-#ifdef BPF
-    if ((shared_count & (TRACE_BUFFER-1)) == 0) {
-	    write_time_deltas();
-    }
-#endif
-    pthread_mutex_unlock(&count_mutex);
     
     memcpy(bytes, &data[index * page_size], page_size);
     memset(bytes, *bytes + 1, page_size);
@@ -44,9 +36,6 @@ void read_write(uint64_t index) {
 
 void read(uint64_t index) {
     char bytes[page_size];
-    pthread_mutex_lock(&count_mutex);
-    shared_count++;
-    pthread_mutex_unlock(&count_mutex);
 
     memcpy(bytes, &data[index * page_size], page_size);
 }
@@ -160,11 +149,11 @@ void print_address(int address, int thread_id, int miss) {
         printf("%s%d%s ", thread_colors[thread_id % COLORS], address, reset_color);
     }
 
-    pthread_mutex_lock(&count_mutex);
-    shared_count++;
-    if (shared_count % NUMBERS_PER_LINE == 0)
-        printf("\n");
-    pthread_mutex_unlock(&count_mutex);
+    // pthread_mutex_lock(&count_mutex);
+    // shared_count++;
+    // if (shared_count % NUMBERS_PER_LINE == 0)
+    //     printf("\n");
+    // pthread_mutex_unlock(&count_mutex);
 }
 
 void print_addresses(int address, pattern_type pattern,int thread_id, int miss) {
@@ -219,16 +208,24 @@ void move_hot_region() {
 
 void *do_access(void *arg) {
     ThreadData *thread = (ThreadData *)arg;
+    uint64_t count = 0;
 
     while (thread->accesses) {
+        count++;
         uint64_t address;
         (thread->accesses)--;
-        address = mod(thread->index, thread->num_of_pages) + thread->offset;
-        (thread->index)++;
         
+        if (thread->thread_id == 1 && cfg.SIMULATE_GC) {
+            address = uniform(thread->num_of_pages) + thread->offset;   
+        } else {
+            address = mod(thread->index, thread->num_of_pages) + thread->offset;
+            (thread->index)++;
+        }
         print_address(address, thread->thread_id, 0);
-        // access_memory(page, pattern);
+        // access_memory(page);
+        cfg.access(address);
     }
+    printf("%lu\n",count);
 
     return NULL;
 }
