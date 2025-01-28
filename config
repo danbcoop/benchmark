@@ -1,26 +1,6 @@
 # Set the distribution of memory accesses
 
-# Set number of patterns with own hot region
-num_epochs = 1
-
-# Memory settings
-hot_ratio = 0.2 # Set the fraction of hot pages to cold pages in memory
-hot_frequency = 0.6 # Set the access frequency of hot pages
-hit_rate = 0.8 # Set the hit rate of a page access
-
-# Set relative share of acces pattern in percent (should add up to 100)
-pattern_strided = 0
-pattern_sequential = 100
-pattern_random = 0
-pattern_ladder = 0
-
-param_stride = 3
-param_pattern_length = 8
-
-# size_of_element = 16*1024
-
-memory = 2*1024*1024
-threads = 3
-
+threads = 2 
+simulate_gc = 1  
 access_type = rw # r, rw
 

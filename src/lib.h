@@ -8,12 +8,13 @@
 
 #define MAX_LINE_LENGTH 256
 #define NUMBERS_PER_LINE 20
-#define VERBOSE 
+/*#define VERBOSE */
 #define COLORS 5
 #define TEST
 #define NUMA_NODE_LOCAL 0
 #define TRACE_BUFFER 1024
-// #define BPF
+/*#define BPF*/
+#define MAX_PAGES 999998976
 
 
 typedef enum access_type {

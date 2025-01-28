@@ -30,7 +30,7 @@ void read_write(uint64_t index) {
     char bytes[page_size];
     
     memcpy(bytes, &data[index * page_size], page_size);
-    memset(bytes, *bytes + 1, page_size);
+    memset(bytes, *bytes + uniform(2), page_size);
     memcpy(&data[index * page_size], bytes, page_size);
 }
 
@@ -73,9 +73,15 @@ void read_config(FILE *file, Config *cfg) {
                 cfg->NUM_THREADS = value;
             } else if (strcmp(key, "pattern_random") == 0) {
                 cfg->ratio_rand = value;
-            } else {
-                fprintf(stderr, "Unknown option: %s\n", key);
+            } else if (strcmp(key, "simulate_gc") == 0) {
+                cfg->SIMULATE_GC = value;
+            } 
+#ifdef VERBOSE
+	      else {
+
+                printf("Unknown option: %s\n", key);
             }
+#endif
         }
     }
 }
@@ -208,10 +214,10 @@ void move_hot_region() {
 
 void *do_access(void *arg) {
     ThreadData *thread = (ThreadData *)arg;
-    uint64_t count = 0;
+    /*uint64_t count = 0;*/
 
     while (thread->accesses) {
-        count++;
+        /*count++;*/
         uint64_t address;
         (thread->accesses)--;
         
@@ -221,11 +227,11 @@ void *do_access(void *arg) {
             address = mod(thread->index, thread->num_of_pages) + thread->offset;
             (thread->index)++;
         }
-        print_address(address, thread->thread_id, 0);
+        /*print_address(address, thread->thread_id, 0);*/
         // access_memory(page);
         cfg.access(address);
     }
-    printf("%lu\n",count);
+    /*printf("%lu\n",count);*/
 
     return NULL;
 }
