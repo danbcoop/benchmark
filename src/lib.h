@@ -55,6 +55,7 @@ uint64_t compute_number_of_accesses(void);
 uint64_t num_of_elements(uint64_t available_memory, uint32_t element_size, 
                             double hot_fraction, double hot_cold_ratio, double hit_rate);
 void write_time_deltas(void);
+void generate_random_index(uint64_t num_of_pages);
 
 // int allocate_data();
 // void initialize_data();

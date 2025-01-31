@@ -20,6 +20,7 @@ uint32_t page_size;
 uint64_t num_pages;
 uint64_t accesses;
 uint64_t offset = 0;
+uint64_t random_index_array[MAX_PAGES/4096];
 FILE *file_out;
 
 Config cfg = {.HOT_COLD_FRACTION=0.2, .HOT_RATE=0.5, .HIT_RATE=0.7, .NUM_THREADS=0, .SIZE_SEQUENCE=8,
@@ -208,6 +209,13 @@ uint64_t num_of_elements(uint64_t available_memory, uint32_t element_size, doubl
 	return remote_cold_elements + available_elements;
 }
 
+void generate_random_index(uint64_t num_of_pages) {
+    for (int i = 0; i < num_of_pages; i++) {
+        random_index_array[i] = i;
+    } 
+    shuffle_array(random_index_array, num_of_pages); 
+}
+
 void move_hot_region() {
     offset = uniform(num_pages);
 }
@@ -222,12 +230,13 @@ void *do_access(void *arg) {
         (thread->accesses)--;
         
         if (thread->thread_id == 1 && cfg.SIMULATE_GC) {
-            address = uniform(thread->num_of_pages) + thread->offset;   
+            address = random_index_array[mod(thread->index, thread->num_of_pages)] + thread->offset;
+            // address = uniform(thread->num_of_pages) + thread->offset;   
         } else {
             address = mod(thread->index, thread->num_of_pages) + thread->offset;
-            (thread->index)++;
         }
-        /*print_address(address, thread->thread_id, 0);*/
+        (thread->index)++;
+        // print_address(address, thread->thread_id, thread->thread_id==1);
         // access_memory(page);
         cfg.access(address);
     }

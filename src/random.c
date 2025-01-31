@@ -37,3 +37,15 @@ int uniform(int N) {
 double uniform_double() {
     return ((double)rand()/RAND_MAX);
 }
+
+// Function to randomize an array
+void shuffle_array(uint64_t *array, uint64_t N) {
+    // Shuffle the array using the Fisher-Yates algorithm
+    for (int i = N - 1; i > 0; i--) {
+        int j = uniform(i + 1);
+        // Swap arr[i] and arr[j]
+        int temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+}

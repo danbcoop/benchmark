@@ -101,6 +101,10 @@ int main(int argc, char *argv[]) {
         thread_data[i].accesses = thread_data[i].num_of_pages * 3;
         thread_data[i].index = 0;
 
+        if (i == 1) {
+            generate_random_index(thread_data[i].num_of_pages);           
+        }
+
         if (pthread_create(&threads[i], NULL, do_access, &thread_data[i]) != 0) {
             printf("Thread creation failed.");
             return 1;
